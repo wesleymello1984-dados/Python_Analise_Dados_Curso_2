@@ -146,6 +146,146 @@ def grafico3():
         )
     return figuraGrafico03.to_html()
 
+@app.route('/comparar', methods=['POST','GET'])
+def comparar():
+    opcoes = [
+        'beer_servings',
+        'spirit_servings',
+        'wine_servings'
+    ]
+
+    if request.method == "POST":
+        eixoX = request.form.get('eixo_X')
+        eixoY = request.form.get('eixo_y')
+        if eixoX == eixoY:
+            return "<marquee> Você fez besteira ... escolha tabelas diferentes </marquee>"
+        conn = sqlite3.connect(f'{caminho} banco01.bd')
+        df = pd.read_sql_query("SELECT country, {}, {} FROM bebidas".format(eixoX, eixoY),conn)
+        conn.close()
+
+        figuraComparar = px.scatter(
+            df,
+            x = eixoX,
+            y = eixoY,
+            title = f'Comparação entre {eixoX} VS {eixoY}'
+        )
+        figuraComparar.update_traces(textposition = "top center")
+
+        return figuraComparar.to_html()
+    
+    return render_template_string('''
+        <!-- Isso é um comentátio dentro do HTML -->
+        <style>
+            /* Estilo global com tema escuro neutro */
+body {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    margin: 40px;
+    line-height: 1.6;
+}
+
+/* Título principal */
+h2 {
+    font-size: 28px;
+    color: #f0f0f0;
+    border-bottom: 2px solid #333;
+    padding-bottom: 10px;
+    margin-bottom: 30px;
+}
+
+/* Todos os <form> no site */
+form {
+    background-color: #2c2c2c;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
+    max-width: 400px;
+}
+
+/* Rótulos dos campos */
+label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: bold;
+    color: #cccccc;
+    font-size: 15px;
+}
+
+/* Estilo dos <select> */
+select {
+    width: 100%;
+    padding: 10px;
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 14px;
+    appearance: none;
+    outline: none;
+    transition: border 0.3s ease;
+}
+
+select:hover, select:focus {
+    border-color: #888;
+}
+
+/* Botão de envio */
+input[type="submit"] {
+    background-color: #444;
+    color: #fff;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    width: 100%;
+}
+
+input[type="submit"]:hover {
+    background-color: #555;
+    transform: scale(1.02);
+}
+
+input[type="submit"]:active {
+    background-color: #333;
+    transform: scale(0.98);
+}
+
+/* Estilizar quebras de linha apenas para espaçamento */
+br {
+    display: block;
+    margin: 10px 0;
+}
+</style>
+
+        <h2> Comprar Campos </h2>
+        <form method="POST">
+            <label for="eixo_x"> Eixo X: </label>
+            <select name="eixo_x">
+                                  
+               {% for opcao in opcoes %}                   
+                <option value="{{opcao}}"> {{opcao}} </option>
+               {% endfor %} 
+                                                    
+            </select>
+            <br></br>
+                                  
+            <label for="eixo_y"> Eixo Y: </label>
+            <select name="eixo_y">
+                {% for opcao in opcoes %}
+                <option value="{{opcao}}" > {{opcao}} </option>
+                {% endfor %}
+
+            </select>
+            <br></br>
+                                  
+            <input type="submit" value="-- Comparar ---">
+        </form>
+''', opcoes = opcoes)
+
 if __name__ == '__main__':
     criarBancoDados ()
     app.run(debug=True)
