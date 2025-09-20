@@ -163,7 +163,7 @@ def editar_inadimplencia():
         try:
             novo_valor = float(novo_valor)
         except:
-            return jsonify ({'Erro':'Valor Invalido'}),418
+            return jsonify({'Erro':'Valor Invalido'}),418
         with sqlite3.connect(f'{pasta}{caminhoBd}') as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -179,17 +179,140 @@ def editar_inadimplencia():
     return render_template_string (f'''
         <h1> Editar Inadimplência </h1>
             <form method="POST">
-                <label for='campo_mes'> Mês (AAAA-MM) </label>
+                <label for='campo_mes'> Mês (AAAA-MM): </label>
                 <input type='text' name='campo_mes'><br> 
                                                                      
-                <label for='campo_mes'> Novo valor </label>
-                <imput type='text' name='campo_valor'><br>
+                <label for='campo_mes'> Novo valor: </label>
+                <input type='text' name='campo_valor'><br>
 
                 <input type='submit' value='Salvar'>
             </form>
             <br>
             <a href='{rotas[0]}'> Voltar </a>
 ''')
+
+@app.route(rotas[5])
+def correlacao():
+    with sqlite3.connect(f'{pasta}{caminhoBd}') as conn:
+        inad_df = pd.read_sql_query('SELECT * FROM inadimplencia', conn)
+        selic_df = pd.read_sql_query('SETECT * FROM selic', conn)
+
+    # realiza uma junção entre os dois detaframes usando a coluna de mes como chave
+    merged = pd.merget(inad_df, selic_df, on='mes')
+
+    # calcular o coeficiente da correlação de pearson entre as duas variáveis
+    correl = merged['inadimplencia'].corr(merged['selic_diaria'])
+
+    # registra as variáveis para a regressão linear  onde X é a variável independente e Y é a variável dependente
+    X = merged['selic_diaria']
+    Y = merged['inadimplencia']
+
+    # calcula o coeficiente da reta de regrassão linerar onde M é a inclinadação e B é a interseção
+    m, b = np.polyfit(X, Y, 1)
+
+    # Oba!!! Gráficos ☺
+
+    fig = go.Figure()
+    fig.add_trace(go.Scetter(
+        X = X,
+        Y = Y,
+        mode = 'markers',
+        name = 'Inadimplencia x Selic',
+        marker = dict(
+            color = 'rgba(0, 123, 255, 0.8)',
+            size = 12,
+            line = dict(width = 2, color = 'white'),
+            symbol = 'circle'
+        ),
+        hovertemplate = 'Selic: %{X:.2f}% <br> Inadimplencia: %{Y:.2f}% <extra></extra>'
+    ))
+    fig.add_trace(go.Scatter(
+        X = X,
+        Y = m * X + b,
+        mode = 'lines',
+        line = dict(
+            color = 'rgba(255, 53, 69, 1)', 
+            width = 4,
+            dash = 'dot'
+        )
+    ))
+    fig.update_layout(
+        title = {
+            'text': f'<b> Correlação entre Selic e Inadimplência </b><br><span style="font-size:16px;"> Coeficiência de Correlação: {correl:.2f} </span>',
+            'Y':0.95,
+            'X':0.5,
+            'xanchor' : 'center',
+            'yanchor' : 'top'
+        },
+        xaxis_title = dict(
+            text = 'SELIC Média mensal (%)',
+            font = dict(
+                size = 18,
+                family = 'Arial',
+                color = 'gray'
+                )
+        ),
+        yaxis_title = dict(
+            text = 'inadimplência',
+            font = dict(
+                size = 18,
+                family = 'Arial',
+                color = 'gray'
+                )
+        ),
+        xaxis = dict(
+            tickfont = dict(
+                size = 14,
+                family = 'Arial',
+                color = 'black'
+                ),
+                gridcolor = 'lightgray'
+        ),
+        yaxis = dict(
+            tickfont = dict(
+                size = 14,
+                family = 'Arial',
+                color = 'black'
+                ),
+                gridcolor = 'lightgray'
+        ),
+        font = dict(
+            size = 14,
+            family = 'Arial',
+            color = 'black'
+        ),
+        legend = dict(
+            orientation = 'h',
+            yanchor = 'bottom', 
+            xanchor = 'center',
+            X = 0.5,
+            Y = 1.05,
+            bgcolor = 'rgba(0,0,0,0)',
+            borderwidth = 0
+        ),
+        margin = dict(l = 60, r = 60, t = 120, b = 60),
+        plot_bgcolor = '#f8f9fa',
+        paper_bgcolor = 'white'
+    )
+    graph_html = fig.to_html(
+        full_html = False,
+        include_ploplyjs = 'cdn'
+    )
+    return render_template_string('''
+    <html>
+        <head>
+                <title> Correlação Selic x Inadimplência </title>
+        </head>
+        <body>
+            <h1> Correlação Selic x Inadimplência </h1>
+            <div>{{ grafico|safe }}</div>
+            <br>                                
+            <a href="{{ Voltar }}"> Voltar </a>
+        </body>
+    </html>
+''', grafico = graph_html, voltar = rotas[0])
+
+
 
 if __name__ == '__main__':
     init_db()
